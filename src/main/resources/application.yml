@@ -35,13 +35,15 @@ chess:
         name: 青云
         code: QINGYUN
         provider: gpt
-        model: mimo-v2.6-pro
-        # 候选着法的合法性已由后端算好，模型只需从二十来个编号里挑一个，
-        # 调高 effort 换不来多少棋力，却会让每一手多等十几秒。想试棋力差异再往上调
-        effort: none
+        model: mimo-v2.6-flash
+        # 候选着法的合法性已由后端算好，模型只需从二十来个编号里挑一个。
+        # 这个值别乱动：实测 mimo 在 low 档一手棋花了 887 秒，34186 个输出 token 里
+        # 34152 个是思考，答案只有 34 个——它的 low 不是别家的 low。往上调只会更久。
+        # 压思考长度靠的是 PromptBuilder 里的决策顺序和判定式规则，不是这个字段。
+        effort: low
       - id: xuanji
         name: 玄机
         code: XUANJI
         provider: gpt
-        model: mimo-v2.6-pro
+        model: mimo-v2.6-flash
         effort: low

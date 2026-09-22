@@ -40,10 +40,16 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
      * 采样温度。
      * <p>
      * 不放进棋手配置：三家里只有这条路认这个字段，为它在 AiPlayer 上留一格，
-     * 另外两家看着都是噪音。取值本身也没什么可调的——模型只是从二十来个编号里挑一个，
-     * 高了纯属乱走，低了两个席位每盘棋一模一样，0.6 是留一点变化又不至于发癫。
+     * 另外两家看着都是噪音。
+     * <p>
+     * 从 0.6 降到 0.3，为的是压思考长度而不是压棋力。推理模型的思考段同样按这个温度采样，
+     * 温度高就更容易在已经得出结论之后再改主意——实测那次 887 秒的调用里，
+     * 思考过程反复出现「先定下来，又推翻重来」，自我推翻占掉了相当一部分 token。
+     * <p>
+     * 代价是两个席位的棋路会比以前接近：0.6 那一档留的变化本来就是为了让两边别每盘一模一样。
+     * 先按「快」优先取 0.3，如果观战时发现两边下得雷同得没意思，再往回抬到 0.4~0.5。
      */
-    private static final double TEMPERATURE = 0.6;
+    private static final double TEMPERATURE = 0.3;
 
     private final ObjectMapper objectMapper;
     private final LlmPayloadLogger payloadLogger;

@@ -66,7 +66,7 @@ class OpenAiCompatibleLlmClientTest {
         Map<String, Object> body = client().buildBody(PLAYER, "sys", "user");
 
         assertThat(body).containsEntry("model", "gpt-4o");
-        assertThat(body).containsEntry("temperature", 0.6);
+        assertThat(body).containsEntry("temperature", 0.3);
     }
 
     @Test
