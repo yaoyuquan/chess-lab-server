@@ -13,7 +13,6 @@ package com.github.chess.config;
  * @param model        实际调用的模型 id
  * @param effort       思考强度。Anthropic 取 low / medium / high / xhigh / max；
  *                     OpenAI 兼容接口原样发成 reasoning_effort，留空则整个字段不带
- * @param temperature  采样温度，越高落子越跳脱，仅 OpenAI 兼容接口生效
  * @author yaoyuquan
  */
 public record AiPlayer(
@@ -22,6 +21,5 @@ public record AiPlayer(
         String code,
         String provider,
         String model,
-        String effort,
-        Double temperature) {
+        String effort) {
 }

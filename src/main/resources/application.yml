@@ -1,9 +1,6 @@
-server:
-  port: 8080
+server.port: 8080
 
-spring:
-  application:
-    name: chess-lab
+spring.application.name: chess-lab
 
 logging:
   level:
@@ -18,6 +15,10 @@ chess:
         # 留空走官方地址，填上可走中转
         base-url: ${ANTHROPIC_BASE_URL:}
         api-key: ${ANTHROPIC_API_KEY:}
+        # 是否开启扩展思考，只有 anthropic 这条路认。默认关：从候选编号里挑一个用不上长链推理，
+        # 开了每一手要多等十几秒。想对比棋力差异再打开；effort 想配到 xhigh/max 也必须一起打开，
+        # 否则官方模型会直接返回 400
+        thinking: ${ANTHROPIC_THINKING:false}
       gpt:
         type: openai
         base-url: ${OPENAI_BASE_URL:}
@@ -37,12 +38,10 @@ chess:
         model: mimo-v2.6-pro
         # 候选着法的合法性已由后端算好，模型只需从二十来个编号里挑一个，
         # 调高 effort 换不来多少棋力，却会让每一手多等十几秒。想试棋力差异再往上调
-        effort: low
-        temperature: 0.6
+        effort: none
       - id: xuanji
         name: 玄机
         code: XUANJI
         provider: gpt
         model: mimo-v2.6-pro
         effort: low
-        temperature: 0.6

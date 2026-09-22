@@ -21,7 +21,7 @@ class PromptBuilderTest {
 
     private static final AiPlayer PLAYER = new AiPlayer(
             "xuanji", "玄机", "XUANJI",
-            "claude", "claude-opus-5", "xhigh", 0.2);
+            "claude", "claude-opus-5", "xhigh");
 
     @Test
     @DisplayName("系统提示词含人设、规则与输出约定")

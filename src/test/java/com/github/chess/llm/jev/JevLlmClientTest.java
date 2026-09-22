@@ -21,10 +21,10 @@ class JevLlmClientTest {
 
     private static final AiPlayer PLAYER = new AiPlayer(
             "jianshi", "见识", "JEV-J",
-            "jev", "jev-latest", null, null);
+            "jev", "jev-latest", null);
 
     private static JevLlmClient client() {
-        ProviderConfig config = new ProviderConfig("jev", "https://example.test/v1", "test-key");
+        ProviderConfig config = new ProviderConfig("jev", "https://example.test/v1", "test-key", null);
         return new JevLlmClient(config, new ObjectMapper(), new LlmPayloadLogger("test"));
     }
 
@@ -77,7 +77,7 @@ class JevLlmClientTest {
     @Test
     @DisplayName("棋手没配 model 时用 jev-latest")
     void defaultsModel() {
-        AiPlayer bare = new AiPlayer("x", "X", "X", "jev", null, null, null);
+        AiPlayer bare = new AiPlayer("x", "X", "X", "jev", null, null);
         MoveQuery q = new MoveQuery(bare, query().chat(), query().jev());
         assertThat(client().buildBody(q)).containsEntry("model", "jev-latest");
     }

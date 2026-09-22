@@ -36,6 +36,15 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
     private static final String PATH = "/chat/completions";
 
+    /**
+     * 采样温度。
+     * <p>
+     * 不放进棋手配置：三家里只有这条路认这个字段，为它在 AiPlayer 上留一格，
+     * 另外两家看着都是噪音。取值本身也没什么可调的——模型只是从二十来个编号里挑一个，
+     * 高了纯属乱走，低了两个席位每盘棋一模一样，0.6 是留一点变化又不至于发癫。
+     */
+    private static final double TEMPERATURE = 0.6;
+
     private final ObjectMapper objectMapper;
     private final LlmPayloadLogger payloadLogger;
     private final JsonHttpClient http;
@@ -63,14 +72,18 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         }
         payloadLogger.logRequest(http.endpoint(PATH), http.headers(), requestJson);
 
+        // 一手棋慢在哪，光看请求体是看不出来的，所以把这一次调用的墙上时间量出来
+        long startedAt = System.nanoTime();
         JsonHttpResponse response;
         try {
             response = http.post(PATH, requestJson);
         } catch (LlmCallException e) {
+            payloadLogger.logTiming(PATH, elapsedMillis(startedAt), "调用失败");
             payloadLogger.logFailure(e.getMessage(), e);
             throw new LlmCallException("调用 OpenAI 兼容接口失败：" + e.getMessage(), e);
         }
         payloadLogger.logResponse(response.status(), response.body());
+        payloadLogger.logTiming(PATH, elapsedMillis(startedAt), usageOf(response.body()));
 
         if (response.isError()) {
             throw new LlmCallException(
@@ -80,12 +93,41 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     /**
+     * 从起始时刻算到现在的毫秒数。
+     */
+    private static long elapsedMillis(long startedAtNanos) {
+        return (System.nanoTime() - startedAtNanos) / 1_000_000L;
+    }
+
+    /**
+     * 把响应里的 token 用量摘成一行。
+     * <p>
+     * reasoning 单独摘出来是这条路最要紧的一个数：这里真正需要的输出只有 {index, reason} 不到
+     * 50 token，剩下的全是推理。配着 low 却仍回来几千 reasoning token，说明对端没认
+     * reasoning_effort，再往下调档也是白调——那是换模型或改 effort 取值的信号，不是等下去的理由。
+     */
+    private String usageOf(String raw) {
+        try {
+            JsonNode usage = objectMapper.readTree(raw).path("usage");
+            if (usage.isMissingNode()) {
+                return "响应未带 usage";
+            }
+            return "in=" + usage.path("prompt_tokens").asInt(-1)
+                    + " out=" + usage.path("completion_tokens").asInt(-1)
+                    + " reasoning=" + usage.path("completion_tokens_details")
+                            .path("reasoning_tokens").asInt(-1);
+        } catch (RuntimeException e) {
+            return "用量未知";
+        }
+    }
+
+    /**
      * 拼请求体。response_format 固定发完整的 json_schema，推理强度固定发 reasoning_effort。
      */
     Map<String, Object> buildBody(AiPlayer player, String systemPrompt, String userPrompt) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", player.model());
-        body.put("temperature", player.temperature() == null ? 1.0 : player.temperature());
+        body.put("temperature", TEMPERATURE);
         body.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)));

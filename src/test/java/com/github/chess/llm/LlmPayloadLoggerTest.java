@@ -56,14 +56,22 @@ class LlmPayloadLoggerTest {
     }
 
     @Test
-    @DisplayName("SDK 路径只打请求行与请求头")
-    void logsHttpRequestLine() {
+    @DisplayName("SDK 路径的密钥头同样只留头尾")
+    void masksSdkSecretHeaders() {
         new LlmPayloadLogger("claude")
-                .logHttpRequest("POST", "https://api.anthropic.com/v1/messages",
-                        Map.of("x-api-key", "sk-ant-abcdefghijklmn1234567890"));
+                .logRequest("https://api.anthropic.com/v1/messages",
+                        Map.of("x-api-key", "sk-ant-abcdefghijklmn1234567890"), "{}");
 
-        assertThat(message()).contains("POST https://api.anthropic.com/v1/messages")
+        assertThat(message()).contains("https://api.anthropic.com/v1/messages")
                 .contains("x-api-key: sk-ant***7890");
+    }
+
+    @Test
+    @DisplayName("响应日志带上状态码与原始报文")
+    void logsStatusAndRawBody() {
+        new LlmPayloadLogger("claude").logResponse(200, "{\"id\":\"msg_1\"}");
+
+        assertThat(message()).contains("HTTP 200").contains("{\"id\":\"msg_1\"}");
     }
 
     private static Map<String, String> headers() {

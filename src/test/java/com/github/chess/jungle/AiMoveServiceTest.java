@@ -34,7 +34,7 @@ class AiMoveServiceTest {
 
     private static final AiPlayer PLAYER = new AiPlayer(
             "xuanji", "玄机", "XUANJI",
-            "claude", "claude-opus-5", "xhigh", 0.2);
+            "claude", "claude-opus-5", "xhigh");
 
     /**
      * 按脚本依次返回结果的大模型桩件。
@@ -78,7 +78,7 @@ class AiMoveServiceTest {
 
     private static AiProperties properties() {
         return new AiProperties(
-                Map.of("claude", new ProviderConfig("anthropic", "", "test-key")),
+                Map.of("claude", new ProviderConfig("anthropic", "", "test-key", false)),
                 List.of(PLAYER));
     }
 

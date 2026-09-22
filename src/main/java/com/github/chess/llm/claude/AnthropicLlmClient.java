@@ -2,8 +2,10 @@ package com.github.chess.llm.claude;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.core.ObjectMappers;
 import com.anthropic.core.http.Headers;
+import com.anthropic.core.http.HttpRequest;
+import com.anthropic.core.http.HttpRequestBody;
+import com.anthropic.core.http.HttpResponse;
 import com.anthropic.core.http.Interceptor;
 import com.anthropic.errors.AnthropicServiceException;
 import com.anthropic.models.messages.*;
@@ -17,6 +19,10 @@ import com.github.chess.llm.LlmPayloadLogger;
 import com.github.chess.llm.MoveChoice;
 import com.github.chess.llm.MoveChoiceSchema;
 import com.github.chess.llm.MoveQuery;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,14 +52,27 @@ public class AnthropicLlmClient implements LlmClient {
      */
     private static final long MAX_TOKENS = 131072L;
 
+    /**
+     * 开启思考时的思考预算。
+     * <p>
+     * 接口要求这个值至少 1024 且小于 max_tokens，这里取一个宽裕但留得下正文的数：
+     * 预算是上限不是配额，模型想得短就花得少，给宽一点只是别让它在半路被掐断。
+     * 没做成配置项是因为开关本身已经够用——真正的分野是想不想，不是想多久。
+     */
+    private static final long THINKING_BUDGET_TOKENS = 32768L;
+
     private final ObjectMapper objectMapper;
     private final LlmPayloadLogger payloadLogger;
     private final AnthropicClient client;
+
+    /** 是否开启扩展思考，来自连接配置 */
+    private final boolean thinkingEnabled;
 
     public AnthropicLlmClient(ProviderConfig config, ObjectMapper objectMapper,
                               LlmPayloadLogger payloadLogger) {
         this.objectMapper = objectMapper;
         this.payloadLogger = payloadLogger;
+        this.thinkingEnabled = config != null && config.thinkingEnabled();
         this.client = buildClient(config, payloadLogger);
     }
 
@@ -64,8 +83,12 @@ public class AnthropicLlmClient implements LlmClient {
      * 只有建连仍保留 SDK 默认的一分钟——连都连不上是网络问题，跟模型想多久无关，那一档必须留着。
      * 重试次数配 0：一次重试就是再等模型把整个推理过程跑完一遍，代价远高于普通接口的重试。
      * <p>
-     * 装一个拦截器只为打日志：真实地址与最终请求头（含 SDK 自己加的那些）是 SDK 内部拼的，
-     * 只有到这一层才看得到。
+     * 装一个拦截器只为打日志：真实地址、SDK 自己加的请求头与原始报文，只有到这一层才看得到。
+     * 报文打的是真正收发的字节，不是把参数对象重新序列化出来的近似结果——排查「对端认不认某个字段」
+     * 这类问题时，两者的差别就是能不能定案。
+     * <p>
+     * 请求头只到 SDK 这一层为止：{@code anthropic-version}、{@code Content-Type} 这些是更底层补的，
+     * 日志里看不到。所以别拿日志当「这个头没发」的证据。
      */
     private static AnthropicClient buildClient(ProviderConfig config, LlmPayloadLogger payloadLogger) {
         if (config == null || !config.hasApiKey()) {
@@ -76,8 +99,21 @@ public class AnthropicLlmClient implements LlmClient {
                 .timeout(Duration.ZERO)
                 .maxRetries(0)
                 .addInterceptor(Interceptor.syncOnly((httpClient, request, requestOptions) -> {
-                    payloadLogger.logHttpRequest(request.method().name(), request.url(), headersOf(request.headers()));
-                    return httpClient.execute(request, requestOptions);
+                    try(HttpRequestBody requestBody = request.body()) {
+                        // JSON 报文的 body 本身就是 repeatable，buffered() 会原样返回它。
+                        // 这一步是留给将来换成流式 body 的情况：那时不先缓存，打印就把流读空了
+                        HttpRequest logged = requestBody == null
+                                ? request
+                                : request.toBuilder().body(requestBody.buffered()).build();
+                        payloadLogger.logRequest(logged.url(), headersOf(logged.headers()), bodyOf(logged));
+
+                        // buffered() 之后 body() 每次都返回新的流，所以读完打日志，SDK 还能照常解析。
+                        // 4xx/5xx 也会走到这里，错误响应的原文同样落进日志
+                        HttpResponse response = httpClient.execute(logged, requestOptions).buffered();
+                        payloadLogger.logResponse(response.statusCode(), readBody(response));
+                        return response;
+                    }
+
                 }));
         if (config.hasBaseUrl()) {
             builder.baseUrl(config.baseUrl());
@@ -96,6 +132,36 @@ public class AnthropicLlmClient implements LlmClient {
         return result;
     }
 
+    /**
+     * 请求体的原始字节。
+     * <p>
+     * 调用方必须先把 body 换成 buffered 的那一份，否则这里写一遍就把不可重复的流耗尽了。
+     */
+    private static String bodyOf(HttpRequest request) {
+        try(HttpRequestBody body = request.body()) {
+            if (body == null) {
+                return "";
+            }
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            body.writeTo(buffer);
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
+     * 响应体的原始字节。
+     * <p>
+     * 同样要求传进来的是 buffered 过的响应，否则读完 SDK 就没得解析了。
+     * 打日志出问题不该影响对局，读失败时只记一句，让调用链继续走。
+     */
+    private static String readBody(HttpResponse response) {
+        try (InputStream in = response.body()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException | RuntimeException e) {
+            return "<读取响应体失败：" + e.getMessage() + ">";
+        }
+    }
+
     @Override
     public boolean isAvailable() {
         return client != null;
@@ -109,14 +175,9 @@ public class AnthropicLlmClient implements LlmClient {
         AiPlayer player = query.player();
         String systemPrompt = query.chat().system();
         String userPrompt = query.chat().user();
-        MessageCreateParams params = MessageCreateParams.builder()
+        MessageCreateParams.Builder builder = MessageCreateParams.builder()
                 .model(player.model())
                 .maxTokens(MAX_TOKENS)
-                // 思考过程和正文共用 max_tokens 预算，推理模型一想起来就能把 4096 全填满，
-                // 正文还没开始写就撞上限，回来的 JSON 是残缺的。这里只是从候选编号里挑一个，
-                // 用不上长链推理，直接把思考关掉，预算全留给正文
-                // 注意：官方模型在 effort 为 xhigh/max 时不接受关闭思考，会返回 400，配置里别往上调
-                .thinking(ThinkingConfigDisabled.builder().build())
                 .outputConfig(OutputConfig.builder()
                         .effort(effortOf(player))
                         .format(MoveChoiceSchema.asAnthropicFormat())
@@ -126,11 +187,9 @@ public class AnthropicLlmClient implements LlmClient {
                                 .text(systemPrompt)
                                 .cacheControl(CacheControlEphemeral.builder().build())
                                 .build()))
-                .addUserMessage(userPrompt)
-                .build();
-
-        // SDK 内部封装了 HTTP，这里用它自带的 mapper 把请求体序列化成与实际报文一致的 JSON
-        payloadLogger.logRequest("messages.create", toJson(params._body()));
+                .addUserMessage(userPrompt);
+        applyThinking(builder);
+        MessageCreateParams params = builder.build();
 
         // 一手棋慢在哪，光看请求体是看不出来的，所以把这一次调用的墙上时间量出来
         long startedAt = System.nanoTime();
@@ -148,6 +207,27 @@ public class AnthropicLlmClient implements LlmClient {
         }
         payloadLogger.logTiming("messages.create", elapsedMillis(startedAt), usageOf(message));
         return parse(message);
+    }
+
+    /**
+     * 按连接配置决定开不开扩展思考。
+     * <p>
+     * 默认关：思考过程和正文共用 max_tokens 预算，推理模型一想起来就能把预算填满，
+     * 正文还没开始写就撞上限，回来的 JSON 是残缺的。这条链路只是从候选编号里挑一个，
+     * 用不上长链推理，关掉能让一手棋快十几秒。
+     * <p>
+     * 留这个开关是因为两件事：想对比「让模型真想一遍」和「直接挑」的棋力差别，
+     * 只能靠它；另外官方模型在 effort 为 xhigh/max 时不接受关闭思考，会直接返回 400，
+     * 想把 effort 配到那两档，就必须同时把思考打开。
+     */
+    private void applyThinking(MessageCreateParams.Builder builder) {
+        if (thinkingEnabled) {
+            builder.thinking(ThinkingConfigEnabled.builder()
+                    .budgetTokens(THINKING_BUDGET_TOKENS)
+                    .build());
+            return;
+        }
+        builder.thinking(ThinkingConfigDisabled.builder().build());
     }
 
     /**
@@ -174,20 +254,6 @@ public class AnthropicLlmClient implements LlmClient {
     }
 
     /**
-     * 用 SDK 自带的 Jackson mapper 序列化，得到与实际报文一致的 JSON。
-     * <p>
-     * SDK 走 Jackson 2，本项目注入的 ObjectMapper 是 Jackson 3，注解体系不通用，所以这里不能复用它。
-     * 打日志出问题不该影响对局，序列化失败时退回对象自身的 toString。
-     */
-    private static String toJson(Object value) {
-        try {
-            return ObjectMappers.jsonMapper().writeValueAsString(value);
-        } catch (Exception e) {
-            return String.valueOf(value);
-        }
-    }
-
-    /**
      * 从响应里取出文本块并解析成着法选择。
      */
     private MoveChoice parse(Message message) {
@@ -196,17 +262,30 @@ public class AnthropicLlmClient implements LlmClient {
                 .filter(Optional::isPresent)
                 .map(block -> block.get().text())
                 .reduce("", String::concat);
-        payloadLogger.logResponse(-1, toJson(message));
         if (text.isBlank()) {
             throw new LlmCallException("Anthropic 返回内容为空，stopReason=" + message.stopReason());
         }
         // 撞到 MAX_TOKENS 时 JSON 是残缺的，直接报出来比让解析器抛个含糊的错强
         if (isTruncated(message)) {
-            throw new LlmCallException("回复在 " + MAX_TOKENS + " token 处被截断。"
-                    + "本地已关闭思考，仍被截断说明服务端没认这个开关，"
-                    + "请确认连接指向的服务是否支持 thinking 参数，或放宽 MAX_TOKENS");
+            throw new LlmCallException("回复在 " + MAX_TOKENS + " token 处被截断。" + truncationHint());
         }
         return JsonMoveChoiceParser.parse(objectMapper, text);
+    }
+
+    /**
+     * 截断时该往哪儿查。
+     * <p>
+     * 同样是截断，开着思考和关着思考要查的方向完全相反：开着就是思考把预算吃光了，
+     * 关着却还截断，说明这个开关对端根本没认。把这句话分开写，省得排查时先自己判断一遍。
+     */
+    private String truncationHint() {
+        if (thinkingEnabled) {
+            return "本地开着思考，思考预算 " + THINKING_BUDGET_TOKENS
+                    + " token，多半是思考把预算吃光了正文没写完，"
+                    + "把连接的 thinking 关掉，或者放宽 MAX_TOKENS";
+        }
+        return "本地已关闭思考，仍被截断说明服务端没认这个开关，"
+                + "请确认连接指向的服务是否支持 thinking 参数，或放宽 MAX_TOKENS";
     }
 
     /**

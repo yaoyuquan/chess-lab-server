@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
  * 把发给模型的请求与模型的原始响应打到日志。
  * <p>
  * 单独拎出来是因为三个客户端都要用，而且排查问题时最需要的就是「发到哪、带了什么头、发了什么、回了什么」。
+ * 官方 SDK 那条路也凑得齐这四样——在拦截器里取原始 body 即可，所以这里不为它留只打请求行的重载。
  * 这是个实验项目，报文一律打印，不设开关：出问题时能直接看到原始报文比日志干净重要得多。
  * 请求头里的密钥统一脱敏，只留头尾几位：够核对是哪一把 key，又不会把完整密钥落进日志文件。
  *
@@ -36,16 +37,6 @@ public final class LlmPayloadLogger {
     }
 
     /**
-     * 打印请求体。拿不到请求头时用这个重载。
-     *
-     * @param endpoint 实际请求的地址
-     * @param payload  请求体
-     */
-    public void logRequest(String endpoint, String payload) {
-        logRequest(endpoint, null, payload);
-    }
-
-    /**
      * 打印请求地址、请求头与请求体。
      *
      * @param endpoint 实际请求的地址
@@ -57,31 +48,13 @@ public final class LlmPayloadLogger {
     }
 
     /**
-     * 只打印请求行与请求头，给官方 SDK 的拦截器用。
-     * <p>
-     * SDK 自己封装了 HTTP，真实地址与最终请求头只有到了拦截器这一层才看得到；
-     * 重试也会走到这里，所以一次调用可能打出多条。
-     *
-     * @param method  HTTP 方法
-     * @param url     完整地址
-     * @param headers 实际发出的请求头
-     */
-    public void logHttpRequest(String method, String url, Map<String, String> headers) {
-        log.info("[{}] → {} {}{}", providerName, method, url, formatHeaders(headers));
-    }
-
-    /**
      * 打印响应。
      *
-     * @param status  HTTP 状态码，SDK 路径拿不到时传 -1
+     * @param status  HTTP 状态码
      * @param payload 响应体
      */
     public void logResponse(int status, String payload) {
-        if (status < 0) {
-            log.info("[{}] ← 响应\n{}", providerName, payload);
-        } else {
-            log.info("[{}] ← 响应 HTTP {}\n{}", providerName, status, payload);
-        }
+        log.info("[{}] ← 响应 HTTP {}\n{}", providerName, status, payload);
     }
 
     /**

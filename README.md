@@ -51,7 +51,7 @@ ANTHROPIC_API_KEY=sk-ant-... mvn spring-boot:run
 **两个席位完全对等**：没有难度分级，也没有棋风之分，`system-prompt` 一字不差
 （yml 里用 YAML 锚点 `&ai-system-prompt` / `*ai-system-prompt` 绑在一起，改一处两边都变）。
 唯一的区别是各自指向哪条连接、哪个模型——把两个席位的 `provider` 指到不同家，
-观战模式就成了两个模型的对局。每个席位一套 `provider / model / effort / temperature`。
+观战模式就成了两个模型的对局。每个席位一套 `provider / model / effort`。
 
 ### 切换服务商
 
@@ -66,6 +66,7 @@ chess:
         type: anthropic
         base-url: ${ANTHROPIC_BASE_URL:}      # 留空走官方地址，填上可走中转
         api-key: ${ANTHROPIC_API_KEY:}
+        thinking: false                       # 是否开启扩展思考，只有 anthropic 认，默认关
       gpt:
         type: openai
         base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
@@ -82,7 +83,6 @@ chess:
       - id: xuanji
         provider: gpt
         model: gpt-4o
-        temperature: 0.6                      # temperature 仅 OpenAI 兼容接口生效
 ```
 
 于是观战模式可以直接让 **Claude 对 GPT**、**Claude 对 Jev**、**GPT 对 Jev**。
@@ -151,13 +151,42 @@ Jev 没有文字理由，对局记录里的理由由概率分布合成：
 Jev 判断，置信度 0.64，本手概率 0.71，次选 豹 E3→D3 0.22
 ```
 
-`effort`、`temperature` 对 Jev 都不适用，配了也会被忽略；`model` 留空则用 `jev-latest`。
+`effort` 对 Jev 不适用，配了也会被忽略；`model` 留空则用 `jev-latest`。
+
+#### anthropic 的思考开关
+
+`type: anthropic` 的连接多一个 `thinking`，默认 `false`：
+
+```yaml
+providers:
+  claude:
+    type: anthropic
+    thinking: ${ANTHROPIC_THINKING:false}
+  claude-thinking:                            # 同一地址，只有开关不同
+    type: anthropic
+    thinking: true
+```
+
+默认关，是因为思考过程和正文共用 `max_tokens` 预算，而这条链路只是从二十来个候选编号里
+挑一个，长链推理换不来多少棋力，却让每一手多等十几秒。两种情形要打开它：想对比
+「让模型真想一遍」和「直接挑」的棋力差别；或者把棋手的 `effort` 配到 `xhigh`/`max`——
+官方模型在那两档不接受关闭思考，会直接返回 400。
+
+配在连接上而不是棋手上，是因为另外两家根本没有这个概念，摆到 `AiPlayer` 里只会让
+gpt / jev 的棋手都杵着一个对自己无效的开关。所以想让同一个模型开着思考和关着思考各下一盘，
+就像上面那样配两条指向同一地址、只有这个开关不同的连接，两个席位各引一条。
+
+开启后的思考预算是 `AnthropicLlmClient.THINKING_BUDGET_TOKENS`，不进配置：真正的分野是
+想不想，不是想多久。万一撞上截断，异常信息会按当前开关分别告诉你该往哪儿查。
 
 #### openai 这条路按官方字段来
 
 `type: openai` 的连接一律发官方那套：`response_format` 是完整的 `json_schema` + `strict: true`，
 思考深度是 `reasoning_effort`（取棋手的 `effort`，没配就整个字段不带）。这两个字段不做成可配的：
 对端不认，说明接错了地方，该当场报出来，而不是留个开关让人一档档试。
+
+`temperature` 也固定发 0.6，同样不进配置：三家里只有这条路认它，为它在棋手上留一格，
+另外两家看着都是噪音。要调就改 `OpenAiCompatibleLlmClient.TEMPERATURE`。
 
 接中转时若碰上只认 `json_object` 的服务，改 `OpenAiCompatibleLlmClient.buildBody` 即可——
 提示词里已经写死了输出约定，解析器也兼容模型裹的 Markdown 围栏，降档不影响能不能用。
@@ -184,7 +213,7 @@ Jev 判断，置信度 0.64，本手概率 0.71，次选 豹 E3→D3 0.22
 
 ```
 [gpt] → 请求 https://api.openai.com/v1/chat/completions
-{"model":"gpt-4o","temperature":1.0,"messages":[...]}
+{"model":"gpt-4o","temperature":0.6,"messages":[...]}
 [gpt] ← 响应 HTTP 200
 {"id":"...","choices":[{"message":{"content":"{\"index\": 3, ...}"}}]}
 ```
@@ -226,7 +255,7 @@ Anthropic 走官方 Java SDK，OpenAI 兼容走 `RestClient` 直连 `/chat/compl
 ## 测试
 
 ```bash
-mvn test     # 45 个用例：连接池路由、必填校验、Jev 请求形状、兜底选择、提示词构造、降级、响应解析
+mvn test     # 55 个用例：连接池路由、必填校验、Jev 请求形状、兜底选择、提示词构造、降级、响应解析、思考开关
 ```
 
 ## 目录

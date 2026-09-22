@@ -20,13 +20,11 @@ public class BoardRenderer {
      * 渲染整张棋盘。
      */
     public String render(List<List<BoardCell>> board) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(renderGrid(board));
-        sb.append('\n');
-        sb.append(renderPieceList(board, "r"));
-        sb.append('\n');
-        sb.append(renderPieceList(board, "b"));
-        return sb.toString();
+        return renderGrid(board) +
+                '\n' +
+                renderPieceList(board, "r") +
+                '\n' +
+                renderPieceList(board, "b");
     }
 
     /**

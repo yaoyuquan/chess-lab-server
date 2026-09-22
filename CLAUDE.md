@@ -6,7 +6,7 @@ AI 对弈平台的后端服务。目前只支持斗兽棋（Jungle Chess），�
 ## 常用命令
 
 ```bash
-mvn test                                        # 45 个单测，全部离线，不打真实模型
+mvn test                                        # 55 个单测，全部离线，不打真实模型
 mvn spring-boot:run                             # 起在 8080
 ANTHROPIC_API_KEY=sk-ant-... mvn spring-boot:run
 mvn test -Dtest=LlmClientRegistryTest           # 跑单个测试类
@@ -96,8 +96,18 @@ Jev 不生成文本，而是在给定候选项里做带概率的判断，因此�
 - **请求体与原始响应全量打日志，没有开关**（`LlmPayloadLogger`，前缀是连接名），
   另有每次调用的耗时与 token 用量。密钥类请求头打印前只留头尾（`Bearer` 这类前缀保留）。
   这是实验项目，排查时看到原始报文比日志干净重要。
-- **`effort` / `temperature` 不是通用字段**：`effort` 只对 `openai`（映射成 `reasoning_effort`）
-  和 anthropic 生效，两者对 Jev 都不适用，配了会被忽略。
+- **`effort` 不是通用字段**：只对 `openai`（映射成 `reasoning_effort`）和 anthropic 生效，
+  对 Jev 不适用，配了会被忽略。
+- **只有一家认的参数不进配置。** `temperature` 三家里只有 `openai` 这条路认，所以它是
+  `OpenAiCompatibleLlmClient` 里的常量，不在 `AiPlayer` 上占一格——否则另外两家的棋手
+  配置里都杵着一个对自己无效的字段。新加参数时照这条判断：能落到 `AiPlayer` 的，
+  得是多数路径都用得上的。
+- **`thinking` 是连接级的，只对 anthropic 生效。** 配在 `ProviderConfig` 上而不是 `AiPlayer`，
+  走的还是上面那条：另外两家没有这个概念，摆到棋手上就成了噪音。默认关——这条链路只是
+  从候选编号里挑一个，长链推理换不来棋力却让每手多等十几秒；但 `effort` 配到 `xhigh`/`max`
+  时官方模型不接受关闭思考，会返 400，那两档必须同时把它打开。思考预算是
+  `AnthropicLlmClient.THINKING_BUDGET_TOKENS` 常量，没做成配置：分野是想不想，不是想多久。
+  想让同一模型开着和关着各下一盘，就配两条只有这个开关不同的连接。
 
 ## 代码规约
 

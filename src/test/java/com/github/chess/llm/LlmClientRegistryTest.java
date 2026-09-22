@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 class LlmClientRegistryTest {
 
     private static AiPlayer player(String id, String provider, String model) {
-        return new AiPlayer(id, id, id, provider, model, "medium", 0.5);
+        return new AiPlayer(id, id, id, provider, model, "medium");
     }
 
     /**
@@ -31,8 +31,8 @@ class LlmClientRegistryTest {
      */
     private static AiProperties properties(List<AiPlayer> players) {
         Map<String, ProviderConfig> providers = new LinkedHashMap<>();
-        providers.put("claude", new ProviderConfig("anthropic", "", "claude-key"));
-        providers.put("gpt", new ProviderConfig("openai", "https://example.test/v1", "gpt-key"));
+        providers.put("claude", new ProviderConfig("anthropic", "", "claude-key", false));
+        providers.put("gpt", new ProviderConfig("openai", "https://example.test/v1", "gpt-key", null));
         return new AiProperties(providers, players);
     }
 
@@ -97,7 +97,7 @@ class LlmClientRegistryTest {
     @DisplayName("缺少密钥的连接建得出客户端但标记为不可用")
     void marksKeylessProviderUnavailable() {
         Map<String, ProviderConfig> providers = new LinkedHashMap<>();
-        providers.put("claude", new ProviderConfig("anthropic", "", ""));
+        providers.put("claude", new ProviderConfig("anthropic", "", "", false));
         AiPlayer p = player("x", "claude", "claude-opus-5");
         AiProperties properties = new AiProperties(providers, List.of(p));
         LlmClientRegistry registry = registry(properties);
@@ -126,8 +126,8 @@ class LlmClientRegistryTest {
     @DisplayName("同一条连接换个 type 就换一套接口格式")
     void switchesWireFormatByType() {
         AiPlayer p = player("zisu", "relay", "some-model");
-        ProviderConfig openAi = new ProviderConfig("openai", "https://relay.example.test/v1", "relay-key");
-        ProviderConfig anthropic = new ProviderConfig("anthropic", "https://relay.example.test", "relay-key");
+        ProviderConfig openAi = new ProviderConfig("openai", "https://relay.example.test/v1", "relay-key", null);
+        ProviderConfig anthropic = new ProviderConfig("anthropic", "https://relay.example.test", "relay-key", false);
 
         assertThat(registry(single("relay", openAi, p)).clientFor(p))
                 .isInstanceOf(OpenAiCompatibleLlmClient.class);
@@ -139,7 +139,7 @@ class LlmClientRegistryTest {
     @DisplayName("type 留空按 anthropic 处理")
     void blankTypeMeansAnthropic() {
         AiPlayer p = player("zisu", "relay", "claude-opus-5");
-        ProviderConfig blank = new ProviderConfig(null, "https://relay.example.test", "relay-key");
+        ProviderConfig blank = new ProviderConfig(null, "https://relay.example.test", "relay-key", null);
 
         assertThat(registry(single("relay", blank, p)).clientFor(p))
                 .isInstanceOf(AnthropicLlmClient.class);
@@ -149,7 +149,7 @@ class LlmClientRegistryTest {
     @DisplayName("type 拼错时启动就失败，不会默默退回某种格式")
     void rejectsUnknownType() {
         AiPlayer p = player("zisu", "relay", "some-model");
-        ProviderConfig typo = new ProviderConfig("openai-compatible", "https://relay.example.test/v1", "relay-key");
+        ProviderConfig typo = new ProviderConfig("openai-compatible", "https://relay.example.test/v1", "relay-key", null);
 
         assertThatThrownBy(() -> registry(single("relay", typo, p)))
                 .isInstanceOf(IllegalStateException.class)
