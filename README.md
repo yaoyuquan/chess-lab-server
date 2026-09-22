@@ -183,7 +183,7 @@ Jev 判断，置信度 0.64，本手概率 0.71，次选 豹 E3→D3 0.22
 {"id":"...","choices":[{"message":{"content":"{\"index\": 3, ...}"}}]}
 ```
 
-密钥只在请求头里，不会被打出来。单条超过 8000 字符会截断并标注原始长度。
+请求头里的密钥打印前只留头尾（`Bearer` 这类方案前缀保留），另有每次调用的耗时与 token 用量。
 
 Anthropic 走官方 Java SDK，OpenAI 兼容走 `RestClient` 直连 `/chat/completions`，
 两者都用结构化输出约束模型只返回 `{index, reason}`。
