@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: jungle-chess-lab
+
+logging:
+  level:
+    com.yaoyuquan.jungle: INFO
+
+jungle:
+  ai:
+    # 具名连接池。棋手通过 provider 字段引用其中一条（必填），不同棋手可以分属不同服务商
+    providers:
+      claude:
+        type: anthropic
+        # 留空走官方地址，填上可走中转
+        base-url: ${ANTHROPIC_BASE_URL:}
+        api-key: ${ANTHROPIC_API_KEY:}
+      gpt:
+        type: openai
+        base-url: ${OPENAI_BASE_URL:}
+        api-key: ${OPENAI_API_KEY:}
+      jev:
+        # TypeSafe 的 System One 判断型模型，不生成文本，直接在候选着法里挑一个
+        type: jev
+        base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai/v1}
+        api-key: ${TYPESAFE_API_KEY:}
+    # 一场对局最多两个 AI：人机对战挑其中一个当对手，观战模式就是这两个互下。
+    # 两个席位完全对等，唯一的区别是各自指向哪条连接、哪个模型。
+    players:
+      - id: qingyun
+        name: 青云
+        code: QINGYUN
+        provider: gpt
+        model: mimo-v2.6-pro
+        # 候选着法的合法性已由后端算好，模型只需从二十来个编号里挑一个，
+        # 调高 effort 换不来多少棋力，却会让每一手多等十几秒。想试棋力差异再往上调
+        effort: low
+        temperature: 0.6
+      - id: xuanji
+        name: 玄机
+        code: XUANJI
+        provider: gpt
+        model: mimo-v2.6-pro
+        effort: low
+        temperature: 0.6
