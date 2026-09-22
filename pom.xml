@@ -12,9 +12,9 @@
   </parent>
 
   <groupId>com.yaoyuquan</groupId>
-  <artifactId>jungle-chess-lab-backend</artifactId>
+  <artifactId>chess-lab-server</artifactId>
   <version>0.1.0</version>
-  <name>jungle-chess-lab-backend</name>
+  <name>chess-lab-server</name>
   <description>斗兽棋 AI 服务：棋手人设配置与 LLM 着法决策</description>
 
   <properties>

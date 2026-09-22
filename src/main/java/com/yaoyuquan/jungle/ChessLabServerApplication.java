@@ -13,9 +13,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class JungleChessLabApplication {
+public class ChessLabServerApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(JungleChessLabApplication.class, args);
+        SpringApplication.run(ChessLabServerApplication.class, args);
     }
 }
