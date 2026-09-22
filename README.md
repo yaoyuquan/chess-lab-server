@@ -4,14 +4,20 @@
 
 ## 架构
 
-规则与 AI 分居两端：
+本仓库是纯后端工程：Java 25 + Spring Boot 4 + Maven，对外只暴露两个 HTTP 接口，
+不含任何前端资源。技术坐标：
 
-| 层 | 职责 |
+| | |
 |---|---|
-| **前端** React + TypeScript | 完整规则引擎、对局状态、悔棋历史、胜负判定，以及全部交互 |
-| **后端** Java 25 + Spring Boot 4（本仓库） | **无状态 AI 服务**：棋手人设 / 提示词配置 + 调用模型在候选着法里选一步；棋手可分属不同服务商（Claude / OpenAI 兼容 / Jev） |
+| 构建 | Maven，`com.github.chess:chess-lab-server` |
+| 基础包 | `com.github.chess` |
+| 运行 | 内嵌 Tomcat，默认 8080 |
+| 形态 | **无状态**：不存棋局、不接数据库，每次请求自带完整局面 |
 
-每一手 AI 回合，前端把当前棋盘和自己算好的**合法着法编号列表**发给后端，
+职责只有一件事：**棋手人设 / 提示词配置 + 调用模型在候选着法里选一步**，
+棋手可分属不同服务商（Claude / OpenAI 兼容 / Jev）。
+
+规则与 AI 分居两端：每一手 AI 回合，前端把当前棋盘和自己算好的**合法着法编号列表**发给后端，
 后端把它们塞进提示词让模型返回一个编号。后端不生成着法、不判胜负，因此规则永远只有一份实现。
 
 **对局永不卡死**：模型返回越界编号或调用失败时直接用启发式兜底
@@ -33,7 +39,7 @@ ANTHROPIC_API_KEY=sk-ant-... mvn spring-boot:run
 
 ## 配置
 
-棋手写在 `src/main/resources/application.yml` 的 `jungle.ai.players` 下，
+棋手写在 `src/main/resources/application.yml` 的 `chess.ai.players` 下，
 **正好两个**——一场对局最多就两个 AI：人机对战挑其中一个当对手，
 观战模式就是这两个互下。
 
@@ -49,11 +55,11 @@ ANTHROPIC_API_KEY=sk-ant-... mvn spring-boot:run
 
 ### 切换服务商
 
-`jungle.ai.providers` 是一条条**具名连接**，棋手用 `provider` 字段引用其中一条。
+`chess.ai.providers` 是一条条**具名连接**，棋手用 `provider` 字段引用其中一条。
 不同棋手可以分属不同服务商，同一连接下的棋手共享一个客户端实例：
 
 ```yaml
-jungle:
+chess:
   ai:
     providers:
       claude:
@@ -193,13 +199,15 @@ Anthropic 走官方 Java SDK，OpenAI 兼容走 `RestClient` 直连 `/chat/compl
 
 ## 接口
 
+完整的字段说明、错误码与调用约定见 **[doc/api.md](doc/api.md)**。
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/ai/models` | 棋手清单 |
-| POST | `/api/ai/move` | 在候选着法里选一条 |
+| GET | `/api/ai/models` | 棋手清单，与棋种无关 |
+| POST | `/api/jungle/ai/move` | 斗兽棋：在候选着法里选一条 |
 
 ```jsonc
-// POST /api/ai/move
+// POST /api/jungle/ai/move
 {
   "playerId": "xuanji",
   "side": "r",
@@ -223,10 +231,17 @@ mvn test     # 45 个用例：连接池路由、必填校验、Jev 请求形状�
 
 ## 目录
 
+基础包 `com.github.chess`：
+
 ```
-src/main/java/com/yaoyuquan/jungle/
+src/main/java/com/github/chess/
 ├── config/   棋手与服务商配置绑定
-├── ai/       棋盘渲染、提示词构造、启发式兜底、决策服务
-├── llm/      LlmClient 接口 + Anthropic / OpenAI 兼容 / Jev 三个实现 + 具名连接池 LlmClientRegistry
-└── web/      接口层与异常处理
+├── llm/      LlmClient 接口、具名连接池 LlmClientRegistry，以及三家共用的件；
+│             每家服务商一个子包
+│   ├── claude/  AnthropicLlmClient
+│   ├── gpt/     OpenAiCompatibleLlmClient
+│   └── jev/     JevLlmClient、JevPrompt
+├── web/      与棋种无关的接口层与异常处理
+└── jungle/   斗兽棋一整条链路：棋盘知识、渲染、提示词、兜底、决策服务、
+              自己的控制器与 DTO。加围棋就在旁边新建 go/
 ```

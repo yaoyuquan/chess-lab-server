@@ -3,13 +3,13 @@ server:
 
 spring:
   application:
-    name: jungle-chess-lab
+    name: chess-lab
 
 logging:
   level:
-    com.yaoyuquan.jungle: INFO
+    com.github.chess: INFO
 
-jungle:
+chess:
   ai:
     # 具名连接池。棋手通过 provider 字段引用其中一条（必填），不同棋手可以分属不同服务商
     providers:

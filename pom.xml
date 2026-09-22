@@ -11,7 +11,7 @@
     <relativePath/>
   </parent>
 
-  <groupId>com.yaoyuquan</groupId>
+  <groupId>com.github.chess</groupId>
   <artifactId>chess-lab-server</artifactId>
   <version>0.1.0</version>
   <name>chess-lab-server</name>
