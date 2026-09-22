@@ -5,6 +5,7 @@ target/
 
 # IDE
 .idea/
+.run/
 .vscode/
 *.iml
 *.ipr
