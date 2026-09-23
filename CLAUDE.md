@@ -6,7 +6,7 @@ AI 对弈平台的后端服务。目前只支持斗兽棋（Jungle Chess），�
 ## 常用命令
 
 ```bash
-mvn test                                        # 55 个单测，全部离线，不打真实模型
+mvn test                                        # 63 个单测，全部离线，不打真实模型
 mvn spring-boot:run                             # 起在 8080
 ANTHROPIC_API_KEY=sk-ant-... mvn spring-boot:run
 mvn test -Dtest=LlmClientRegistryTest           # 跑单个测试类
