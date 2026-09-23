@@ -103,7 +103,7 @@ AI 对弈服务（`chess-lab-server`）目前支持斗兽棋，后续会加围�
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `index` | int | 选中的着法编号，必定是请求里某条 `legalMoves[].i` |
-| `reason` | string | 选择理由，一句中文。Jev 这类判断型模型没有文字输出，理由由概率分布合成，形如 `Jev 判断，置信度 0.64，本手概率 0.71，次选 豹 E3→D3 0.22` |
+| `reason` | string | 选择理由，一句中文 |
 | `fallback` | boolean | `true` 表示这一手不是模型选的，是启发式兜底 |
 
 ### fallback 为 true 时

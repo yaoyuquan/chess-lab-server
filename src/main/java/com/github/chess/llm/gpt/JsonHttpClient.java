@@ -1,6 +1,7 @@
-package com.github.chess.llm;
+package com.github.chess.llm.gpt;
 
 import com.github.chess.config.ProviderConfig;
+import com.github.chess.llm.LlmCallException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collections;
@@ -14,7 +15,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * 发 JSON、收原始文本的小客户端，供 OpenAI 兼容与 Jev 两条路径共用。
+ * 发 JSON、收原始文本的小客户端，OpenAI 兼容这条路专用。
+ * <p>
+ * 以前 Jev 也走它，所以放在 llm 根包；Jev 移除后只剩这一家在用，按「一家独有的收进子包」挪到这里。
  * <p>
  * 两个约定很关键：
  * 一是响应按原始字节读回，不交给消息转换器，保证任何状态码下都能拿到报文并打进日志；

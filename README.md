@@ -15,7 +15,7 @@
 | 形态 | **无状态**：不存棋局、不接数据库，每次请求自带完整局面 |
 
 职责只有一件事：**棋手人设 / 提示词配置 + 调用模型在候选着法里选一步**，
-棋手可分属不同服务商（Claude / OpenAI 兼容 / Jev）。
+棋手可分属不同服务商（Claude / OpenAI 兼容）。
 
 规则与 AI 分居两端：每一手 AI 回合，前端把当前棋盘和自己算好的**合法着法编号列表**发给后端，
 后端把它们塞进提示词让模型返回一个编号。后端不生成着法、不判胜负，因此规则永远只有一份实现。
@@ -71,10 +71,6 @@ chess:
         type: openai
         base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
         api-key: ${OPENAI_API_KEY:}
-      jev:
-        type: jev                             # TypeSafe System One，判断型模型
-        base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai/v1}
-        api-key: ${TYPESAFE_API_KEY:}
     players:
       - id: qingyun
         provider: claude                      # 必填，漏了不让起服务
@@ -85,13 +81,12 @@ chess:
         model: gpt-4o
 ```
 
-于是观战模式可以直接让 **Claude 对 GPT**、**Claude 对 Jev**、**GPT 对 Jev**。
+于是观战模式可以直接让 **Claude 对 GPT**。
 同一服务商下想走两条不同中转，也只要多定义一条连接。
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
-export TYPESAFE_API_KEY=...
 export OPENAI_BASE_URL=https://your-endpoint/v1   # 可选
 ```
 
@@ -129,29 +124,12 @@ export OPENAI_BASE_URL=https://your-endpoint/v1   # 可选
 走中转也是同一回事：另开一条连接指向中转地址即可，
 同一家服务商的两条不同线路可以共存。
 
-#### Jev：判断型模型，不是对话模型
+#### 为什么没有 Jev
 
-`type: jev` 走 TypeSafe 的 System One 接口（`POST /systemone`）。它和前两者是**两种东西**：
-Claude / GPT 这类对话模型生成一段文本，我们再从中解析出编号；
-Jev 不生成文本，而是在给定的候选项里做一个**带概率的判断**。
-
-所以同一个局面要摆成两种形状，由 `PromptBuilder` 分别产出：
-
-| | 对话型模型 | Jev |
-|---|---|---|
-| 输入 | system + user 提示词 | `state`（局面）+ `instructions`（任务与规则）+ `criteria`（候选着法） |
-| 原语 | 结构化输出 `{index, reason}` | `choice`，criteria 上限 255 项（着法最多约 40 条，够用） |
-| 输出 | 一段 JSON 文本 | `choice` + `probabilities` + `confidence` |
-| 会不会答非所问 | 会，可能编出不存在的编号，所以要校验，越界就兜底 | **不会**，只能在 criteria 里选 |
-
-候选着法的 key 是 `move_<编号>`，`JevPrompt.optionKey / indexOf` 负责两边还原。
-Jev 没有文字理由，对局记录里的理由由概率分布合成：
-
-```
-Jev 判断，置信度 0.64，本手概率 0.71，次选 豹 E3→D3 0.22
-```
-
-`effort` 对 Jev 不适用，配了也会被忽略；`model` 留空则用 `jev-latest`。
+曾经接过 TypeSafe 的 Jev（System One 判断型模型：不生成文本，只在候选着法里给一个带概率的选择），
+后来移除了。实测它每手只要 1~2 秒，但只认「这一步能吃什么、能不能往前走」，不看对方下一手：
+吃子后被鼠反吃、把子走到对方大子旁边、该守巢时去冲对方的巢，这类局面全错，提示词怎么改都不动它的选择。
+判断型模型要和代码配合——代码推演、它给结果局面打分——才下得了棋，而这个服务不实现规则，给不了它推演。
 
 #### anthropic 的思考开关
 
@@ -172,8 +150,8 @@ providers:
 「让模型真想一遍」和「直接挑」的棋力差别；或者把棋手的 `effort` 配到 `xhigh`/`max`——
 官方模型在那两档不接受关闭思考，会直接返回 400。
 
-配在连接上而不是棋手上，是因为另外两家根本没有这个概念，摆到 `AiPlayer` 里只会让
-gpt / jev 的棋手都杵着一个对自己无效的开关。所以想让同一个模型开着思考和关着思考各下一盘，
+配在连接上而不是棋手上，是因为 openai 那条路根本没有这个概念，摆到 `AiPlayer` 里只会让
+gpt 的棋手都杵着一个对自己无效的开关。所以想让同一个模型开着思考和关着思考各下一盘，
 就像上面那样配两条指向同一地址、只有这个开关不同的连接，两个席位各引一条。
 
 开启后的思考预算是 `AnthropicLlmClient.THINKING_BUDGET_TOKENS`，不进配置：真正的分野是
@@ -185,8 +163,8 @@ gpt / jev 的棋手都杵着一个对自己无效的开关。所以想让同一�
 思考深度是 `reasoning_effort`（取棋手的 `effort`，没配就整个字段不带）。这两个字段不做成可配的：
 对端不认，说明接错了地方，该当场报出来，而不是留个开关让人一档档试。
 
-`temperature` 也固定发 0.6，同样不进配置：三家里只有这条路认它，为它在棋手上留一格，
-另外两家看着都是噪音。要调就改 `OpenAiCompatibleLlmClient.TEMPERATURE`。
+`temperature` 也固定发 0.3，同样不进配置：两家里只有这条路认它，为它在棋手上留一格，
+另一家看着就是噪音。要调就改 `OpenAiCompatibleLlmClient.TEMPERATURE`。
 
 接中转时若碰上只认 `json_object` 的服务，改 `OpenAiCompatibleLlmClient.buildBody` 即可——
 提示词里已经写死了输出约定，解析器也兼容模型裹的 Markdown 围栏，降档不影响能不能用。
@@ -255,7 +233,7 @@ Anthropic 走官方 Java SDK，OpenAI 兼容走 `RestClient` 直连 `/chat/compl
 ## 测试
 
 ```bash
-mvn test     # 55 个用例：连接池路由、必填校验、Jev 请求形状、兜底选择、提示词构造、降级、响应解析、思考开关
+mvn test     # 离线用例：连接池路由、必填校验、兜底选择、提示词构造、降级、响应解析、思考开关
 ```
 
 ## 目录
@@ -265,11 +243,10 @@ mvn test     # 55 个用例：连接池路由、必填校验、Jev 请求形状�
 ```
 src/main/java/com/github/chess/
 ├── config/   棋手与服务商配置绑定
-├── llm/      LlmClient 接口、具名连接池 LlmClientRegistry，以及三家共用的件；
+├── llm/      LlmClient 接口、具名连接池 LlmClientRegistry，以及两家共用的件；
 │             每家服务商一个子包
 │   ├── claude/  AnthropicLlmClient
-│   ├── gpt/     OpenAiCompatibleLlmClient
-│   └── jev/     JevLlmClient、JevPrompt
+│   └── gpt/     OpenAiCompatibleLlmClient、JsonHttpClient
 ├── web/      与棋种无关的接口层与异常处理
 └── jungle/   斗兽棋一整条链路：棋盘知识、渲染、提示词、兜底、决策服务、
               自己的控制器与 DTO。加围棋就在旁边新建 go/

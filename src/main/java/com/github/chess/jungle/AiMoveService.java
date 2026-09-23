@@ -78,13 +78,11 @@ public class AiMoveService {
         Set<Integer> validIndexes = request.legalMoves().stream()
                 .map(LegalMove::i)
                 .collect(Collectors.toSet());
-        // 同一个局面摆成两份视图：对话型模型读提示词，判断型模型读结构化的候选项
         String boardText = boardRenderer.render(request.board());
         MoveQuery query = new MoveQuery(
                 player,
                 new ChatPrompt(promptBuilder.buildSystemPrompt(),
-                        promptBuilder.buildUserPrompt(request, boardText)),
-                promptBuilder.buildJevPrompt(request, boardText));
+                        promptBuilder.buildUserPrompt(request, boardText)));
 
         try {
             MoveChoice choice = llmClient.choose(query);

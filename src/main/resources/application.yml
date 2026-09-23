@@ -23,11 +23,6 @@ chess:
         type: openai
         base-url: ${OPENAI_BASE_URL:}
         api-key: ${OPENAI_API_KEY:}
-      jev:
-        # TypeSafe 的 System One 判断型模型，不生成文本，直接在候选着法里挑一个
-        type: jev
-        base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai/v1}
-        api-key: ${TYPESAFE_API_KEY:}
     # 一场对局最多两个 AI：人机对战挑其中一个当对手，观战模式就是这两个互下。
     # 两个席位完全对等，唯一的区别是各自指向哪条连接、哪个模型。
     players:

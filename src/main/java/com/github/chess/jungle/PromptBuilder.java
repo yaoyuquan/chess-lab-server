@@ -2,9 +2,6 @@ package com.github.chess.jungle;
 
 import com.github.chess.jungle.web.dto.AiMoveRequest;
 import com.github.chess.jungle.web.dto.LegalMove;
-import com.github.chess.llm.jev.JevPrompt;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
@@ -76,7 +73,7 @@ public class PromptBuilder {
             """;
 
     /**
-     * 棋手人设。对话型与判断型模型共用这一段。
+     * 棋手人设。
      * <p>
      * 以前这里还写着「不做亏损的换子、推进时留好退路、留意对方的鼠和狮虎」，
      * 那是在替模型下棋，已删掉。怎么下留给模型自己判断，这里只交代身份和任务。
@@ -139,9 +136,6 @@ public class PromptBuilder {
      * 「不要去找完整的取胜路线」对着的是兽巢附近的局面：模型一看到能进巢就会开始穷举杀法，
      * 这句不能完全压住它，但能让长尾短很多。「快棋」这个设定是整段的由头，
      * 用它来框住思考，比一条条列禁令更容易被模型当成自己的节奏。
-     * <p>
-     * 这段不进 Jev 的 instructions：判断型模型不做链式推理，没有需要压的思考长度，
-     * 把一套给推理模型的止损规矩塞给它，只会变成干扰判断的噪音。
      */
     private static final String THINKING_PACE = """
             这是快棋，每一手的思考时间有限。先看一眼局面有没有接触，再按对应的方式想。
@@ -210,41 +204,6 @@ public class PromptBuilder {
         // 实测下来模型会一直找下去。指回快棋节奏，它才有停下来的依据
         sb.append("\n按快棋的节奏想，走出你这一手。");
         return sb.toString();
-    }
-
-    /**
-     * 构造 Jev 需要的结构化输入。
-     * <p>
-     * 判断型模型没有系统/用户提示词之分：局面放 state，棋手人设与规则放 instructions，
-     * 候选着法放 criteria。key 由 JevPrompt.optionKey 生成，方便把选中的 key 还原成候选编号。
-     * <p>
-     * 这里只放 PERSONA，不放 THINKING_PACE，理由写在那个常量的注释里。
-     */
-    public JevPrompt buildJevPrompt(AiMoveRequest request, String boardText) {
-        String side = request.side();
-        String opponent = JungleBoard.opposite(side);
-
-        Map<String, Object> state = new LinkedHashMap<>();
-        state.put("我方阵营", JungleBoard.sideName(side));
-        state.put("目标兽巢", JungleBoard.toCoord(JungleBoard.targetDenRow(side), 3));
-        if (request.moveNumber() != null) {
-            state.put("当前手数", request.moveNumber());
-        }
-        state.put("棋盘", boardText);
-
-        Map<String, Object> instructions = new LinkedHashMap<>();
-        instructions.put("任务", "你在下斗兽棋，执" + JungleBoard.sideName(side)
-                + "，从候选着法中选出最好的一手。");
-        instructions.put("棋手", PERSONA);
-        instructions.put("规则", RULES);
-        instructions.put("取胜条件", "让棋子走进" + JungleBoard.sideName(opponent)
-                + "的兽巢，或吃光对方棋子，或让对方无子可动。");
-
-        Map<String, String> criteria = new LinkedHashMap<>();
-        for (LegalMove move : request.legalMoves()) {
-            criteria.put(JevPrompt.optionKey(move.i()), describe(move));
-        }
-        return new JevPrompt(state, instructions, criteria);
     }
 
     /**

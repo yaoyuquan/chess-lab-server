@@ -115,7 +115,7 @@ class AnthropicLlmClientTest {
     }
 
     private static MoveQuery query() {
-        return new MoveQuery(PLAYER, new ChatPrompt("你是青云", "该你走了"), null);
+        return new MoveQuery(PLAYER, new ChatPrompt("你是青云", "该你走了"));
     }
 
     /**

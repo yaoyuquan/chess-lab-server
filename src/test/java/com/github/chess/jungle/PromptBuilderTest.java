@@ -107,20 +107,6 @@ class PromptBuilderTest {
     }
 
     @Test
-    @DisplayName("思考节奏不进 Jev：判断型模型没有要压的思考长度")
-    void jevPromptOmitsThinkingPace() {
-        List<List<BoardCell>> board = TestBoards.empty();
-        TestBoards.put(board, 4, 3, 5, "b");
-        List<LegalMove> moves = List.of(TestBoards.move(0, 4, 3, 4, 2, "豹 D5→C5"));
-        AiMoveRequest request = TestBoards.request("qingyun", "b", board, moves);
-
-        String instructions = builder.buildJevPrompt(request, renderer.render(board))
-                .instructions().toString();
-        assertThat(instructions).contains("你是一位斗兽棋棋手");
-        assertThat(instructions).doesNotContain("沿一条主变推三步");
-    }
-
-    @Test
     @DisplayName("系统提示词含小写 json 字样，json_object 模式要求提示词里出现它")
     void systemPromptMentionsJsonKeyword() {
         assertThat(builder.buildSystemPrompt()).contains("json");

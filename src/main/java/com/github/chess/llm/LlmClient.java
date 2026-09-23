@@ -1,12 +1,13 @@
 package com.github.chess.llm;
 
-import com.github.chess.llm.jev.JevPrompt;
-
 /**
  * 大模型调用的统一入口。
  * <p>
- * 目前有三个实现：Anthropic 官方 SDK、OpenAI 兼容接口、TypeSafe 的 Jev。
- * 前两者是对话型模型，读 {@link ChatPrompt}；Jev 是判断型模型，读 {@link JevPrompt}。
+ * 目前有两个实现：Anthropic 官方 SDK 与 OpenAI 兼容接口，都是对话型模型，读 {@link ChatPrompt}。
+ * <p>
+ * 曾经还接过 TypeSafe 的 Jev（判断型模型，不生成文本、只在候选项里给概率）。实测它每手 1~2 秒，
+ * 但只看这一步能吃什么，不看对方下一手，送子、不守巢，棋力太弱，已移除。
+ * 判断型模型要配合代码做推演才能下棋，而这个服务不实现规则，给不了它这一半。
  *
  * @author yaoyuquan
  */

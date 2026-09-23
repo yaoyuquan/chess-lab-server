@@ -2,8 +2,6 @@ package com.github.chess.llm.gpt;
 
 import com.github.chess.config.AiPlayer;
 import com.github.chess.config.ProviderConfig;
-import com.github.chess.llm.JsonHttpClient;
-import com.github.chess.llm.JsonHttpResponse;
 import com.github.chess.llm.JsonMoveChoiceParser;
 import com.github.chess.llm.LlmCallException;
 import com.github.chess.llm.LlmClient;
@@ -39,8 +37,8 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     /**
      * 采样温度。
      * <p>
-     * 不放进棋手配置：三家里只有这条路认这个字段，为它在 AiPlayer 上留一格，
-     * 另外两家看着都是噪音。
+     * 不放进棋手配置：两家里只有这条路认这个字段，为它在 AiPlayer 上留一格，
+     * 另一家看着就是噪音。
      * <p>
      * 从 0.6 降到 0.3，为的是压思考长度而不是压棋力。推理模型的思考段同样按这个温度采样，
      * 温度高就更容易在已经得出结论之后再改主意——实测那次 887 秒的调用里，

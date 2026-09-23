@@ -1,4 +1,4 @@
-package com.github.chess.llm;
+package com.github.chess.llm.gpt;
 
 /**
  * 一次 JSON HTTP 调用的结果。

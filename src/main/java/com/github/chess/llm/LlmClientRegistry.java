@@ -6,7 +6,6 @@ import com.github.chess.config.ProviderConfig;
 import com.github.chess.config.UnknownProviderException;
 import com.github.chess.llm.claude.AnthropicLlmClient;
 import com.github.chess.llm.gpt.OpenAiCompatibleLlmClient;
-import com.github.chess.llm.jev.JevLlmClient;
 import jakarta.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -106,9 +105,6 @@ public class LlmClientRegistry {
                     + " 无法识别，可选值：" + String.join("、", ProviderConfig.SUPPORTED_TYPES));
         }
         LlmPayloadLogger payloadLogger = new LlmPayloadLogger(name);
-        if (config.isJev()) {
-            return new JevLlmClient(config, objectMapper, payloadLogger);
-        }
         if (config.isOpenAi()) {
             return new OpenAiCompatibleLlmClient(config, objectMapper, payloadLogger);
         }

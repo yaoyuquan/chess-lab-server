@@ -125,7 +125,7 @@ class OpenAiCompatibleLlmClientTest {
             ProviderConfig config = new ProviderConfig(
                     "openai", "http://127.0.0.1:" + server.getAddress().getPort() + "/v1", "test-key", null);
             new OpenAiCompatibleLlmClient(config, mapper, new LlmPayloadLogger("gpt")).choose(
-                    new MoveQuery(PLAYER, new ChatPrompt("sys", "user"), null));
+                    new MoveQuery(PLAYER, new ChatPrompt("sys", "user")));
 
             // reasoning 这个数是这条路排查慢的唯一凭据：配着 low 却回来上千 reasoning token，
             // 就说明对端没认 reasoning_effort。谁把它从日志里删掉，这条会失败
