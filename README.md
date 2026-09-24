@@ -9,8 +9,8 @@
 
 | | |
 |---|---|
-| 构建 | Maven，`com.github.chess:chess-lab-server` |
-| 基础包 | `com.github.chess` |
+| 构建 | Maven，`com.github.chesslab:chess-lab-server` |
+| 基础包 | `com.github.chesslab` |
 | 运行 | 内嵌 Tomcat，默认 8080 |
 | 形态 | **无状态**：不存棋局、不接数据库，每次请求自带完整局面 |
 
@@ -212,6 +212,7 @@ Anthropic 走官方 Java SDK，OpenAI 兼容走 `RestClient` 直连 `/chat/compl
 |---|---|---|
 | GET | `/api/ai/models` | 棋手清单，与棋种无关 |
 | POST | `/api/jungle/ai/move` | 斗兽棋：在候选着法里选一条 |
+| POST | `/api/chess/ai/move` | 国际象棋：在候选着法里选一条，局面用 FEN，着法带 UCI 与 SAN |
 
 ```jsonc
 // POST /api/jungle/ai/move
@@ -238,16 +239,17 @@ mvn test     # 离线用例：连接池路由、必填校验、兜底选择、�
 
 ## 目录
 
-基础包 `com.github.chess`：
+基础包 `com.github.chesslab`：
 
 ```
-src/main/java/com/github/chess/
+src/main/java/com/github/chesslab/
 ├── config/   棋手与服务商配置绑定
 ├── llm/      LlmClient 接口、具名连接池 LlmClientRegistry，以及两家共用的件；
 │             每家服务商一个子包
 │   ├── claude/  AnthropicLlmClient
 │   └── gpt/     OpenAiCompatibleLlmClient、JsonHttpClient
 ├── web/      与棋种无关的接口层与异常处理
-└── jungle/   斗兽棋一整条链路：棋盘知识、渲染、提示词、兜底、决策服务、
-              自己的控制器与 DTO。加围棋就在旁边新建 go/
+├── jungle/   斗兽棋一整条链路：棋盘知识、渲染、提示词、兜底、决策服务、
+│             自己的控制器与 DTO。加围棋就在旁边新建 go/
+└── chess/    国际象棋一整条链路，结构同 jungle/
 ```

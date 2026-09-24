@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-AI 对弈平台的后端服务。目前只支持斗兽棋（Jungle Chess），后续要加围棋与国际象棋。
+AI 对弈平台的后端服务。目前支持斗兽棋（Jungle Chess）与国际象棋，后续要加围棋。
 前端（React + TypeScript）在另一个仓库。
 
 ## 常用命令
 
 ```bash
-mvn test                                        # 57 个单测，全部离线，不打真实模型
+mvn test                                        # 81 个单测，全部离线，不打真实模型
 mvn spring-boot:run                             # 起在 8080
 ANTHROPIC_API_KEY=sk-ant-... mvn spring-boot:run
 mvn test -Dtest=LlmClientRegistryTest           # 跑单个测试类
@@ -30,7 +30,7 @@ mvn test -Dtest=LlmClientRegistryTest           # 跑单个测试类
 ## 代码地图
 
 ```
-src/main/java/com/github/chess/
+src/main/java/com/github/chesslab/
 ├── config/   AiProperties（chess.ai.* 配置绑定）、AiPlayer、ProviderConfig
 │             UnknownPlayerException / UnknownProviderException
 ├── llm/      LlmClient 接口、LlmClientRegistry（具名连接池）、MoveQuery / ChatPrompt
@@ -39,13 +39,20 @@ src/main/java/com/github/chess/
 │   └── gpt/     OpenAiCompatibleLlmClient、JsonHttpClient
 ├── web/      与棋种无关的部分：AiController（GET /api/ai/models 棋手清单）、
 │             GlobalExceptionHandler、dto/（AiPlayerView、ApiError）
-└── jungle/   斗兽棋一整条链路
-    ├── JungleBoard         水域 / 兽巢 / 陷阱 / 子力价值
-    ├── BoardRenderer       9×7 网格图 + 子力清单
-    ├── PromptBuilder       斗兽棋规则文本与人设
-    ├── FallbackPicker      入巢 > 吃子 > 推进 的启发式
-    ├── AiMoveService       decide() 决策主流程
-    └── web/   AiController（POST /api/jungle/ai/move）、dto/
+├── jungle/   斗兽棋一整条链路
+│   ├── JungleBoard         水域 / 兽巢 / 陷阱 / 子力价值
+│   ├── BoardRenderer       9×7 网格图 + 子力清单
+│   ├── PromptBuilder       斗兽棋规则文本与人设
+│   ├── FallbackPicker      入巢 > 吃子 > 推进 的启发式
+│   ├── AiMoveService       decide() 决策主流程
+│   └── web/   AiController（POST /api/jungle/ai/move）、dto/
+└── chess/    国际象棋一整条链路，结构同上
+    ├── ChessBoard          FEN 拆解 + 子力价值（不生成着法）
+    ├── BoardRenderer       8×8 网格图 + 子力清单 + 易位权等状态行
+    ├── PromptBuilder       规则要点（写死「候选即全部合法着法」）与人设
+    ├── FallbackPicker      读 SAN 标记：将杀 > 升变 > 吃子 > 将军 > 易位 > 占中
+    ├── AiMoveService       decide()，与斗兽棋那份几乎逐行相同，暂不合并
+    └── web/   AiController（POST /api/chess/ai/move）、dto/
 ```
 
 斗兽棋主流程读 `jungle/AiMoveService.decide()` 一个方法就够，它串起了上面所有东西。
@@ -53,7 +60,7 @@ src/main/java/com/github/chess/
 ## 加一个新棋种
 
 `llm` / `config` 是通用的，`web` 只放与棋种无关的东西（棋手清单、异常处理、ApiError）。
-**一个棋种一个顶层包**：照着 `jungle/` 新建 `go/` 或 `chess/`，把棋盘知识、渲染、提示词、
+**一个棋种一个顶层包**：照着 `jungle/` / `chess/` 新建 `go/`，把棋盘知识、渲染、提示词、
 兜底、决策服务、控制器与请求 DTO 全放进去，路径挂 `/api/<棋种>/ai/move`。
 
 现在**没有**棋种抽象层，也先别急着抽：围棋没有 from/to，国际象棋有易位和升变，
