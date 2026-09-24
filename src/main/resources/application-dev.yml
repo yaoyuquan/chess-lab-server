@@ -1,3 +1,3 @@
 logging:
   level:
-    com.github.chess: DEBUG
+    com.github.chesslab: DEBUG

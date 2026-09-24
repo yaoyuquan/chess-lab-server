@@ -4,7 +4,7 @@ spring.application.name: chess-lab
 
 logging:
   level:
-    com.github.chess: INFO
+    com.github.chesslab: INFO
 
 chess:
   ai:
