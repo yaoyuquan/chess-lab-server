@@ -149,50 +149,8 @@ AI 对弈服务（`chess-lab-server`）目前支持斗兽棋与国际象棋，�
 
 ## POST /api/chess/ai/move
 
-国际象棋：在调用方给出的候选着法里选一条。调用约定与斗兽棋完全一样——合法着法由调用方算、
-几乎不会失败、没有超时，只是局面和着法换成了国际象棋的标准记法。
-
-**请求体**
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `playerId` | string | 是 | 棋手 id，取自 `/models` |
-| `side` | string | 是 | AI 执哪一方，只能是 `w`（白）或 `b`（黑） |
-| `fen` | string | 是 | 当前局面的完整 FEN，六个字段都带上：易位权、吃过路兵格、五十步计数都从这里读 |
-| `history` | string[] | 否 | 开局至今的 SAN 着法序列，如 `["e4", "e5", "Nf3"]`。**从标准初始局面、白方先走开始记**，后端按这个假设排成 `1. e4 e5 2. Nf3` 给模型看；模型靠它看来路、留意三次重复 |
-| `legalMoves` | array | 是 | 全部合法着法，非空 |
-| `legalMoves[].i` | int | 是 | 着法编号，响应的 `index` 就是这个值 |
-| `legalMoves[].uci` | string | 是 | UCI 记法，如 `e2e4`、`e7e8q`（升变带第五位）、`e1g1`（易位写王的起落格） |
-| `legalMoves[].san` | string | 是 | SAN 记法，如 `Nf3`、`exd8=Q+`、`O-O`、`Qxf7#`。**`x` `+` `#` 标记必须带全**：提示词让模型直接采信这些标记，兜底也靠它们识别吃子、将军与将杀 |
-
-`chess.js` 的 `moves({ verbose: true })` 同时给出 `lan`（即 UCI）和 `san`，可以直接拿来填。
-
-`fen` 只校验非空。写坏了不会报错，看不懂的部分当空格读，但渲染和兜底评分会跟着失真。
-
-**200 响应**：与斗兽棋相同，`{ "index", "reason", "fallback" }`，`fallback: true` 时的三种 `reason` 也一样。
-
-兜底启发式（`chess.FallbackPicker`）：将杀 > 升变 > 吃子（先吃价值高的，同样吃用价值低的子去吃）
-> 将军 > 易位 > 往中心走，并避免无故走王，同分随机打散。它不算「吃完会不会被吃回」——那要算攻击关系，
-等于在后端再写一份规则。
-
-### 完整示例
-
-```json
-{
-  "playerId": "xuanji",
-  "side": "b",
-  "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
-  "history": ["e4", "e5", "Nf3"],
-  "legalMoves": [
-    { "i": 0, "uci": "b8c6", "san": "Nc6" },
-    { "i": 1, "uci": "d7d6", "san": "d6" }
-  ]
-}
-```
-
-```json
-{ "index": 0, "reason": "出马保护 e5 兵。", "fallback": false }
-```
+国际象棋走子接口。调用约定与斗兽棋一样，局面和着法换成 FEN / UCI / SAN。
+字段说明、记法约定、容易踩的坑和完整示例单独写在 [`api-chess.md`](api-chess.md)。
 
 ---
 
@@ -206,7 +164,7 @@ AI 对弈服务（`chess-lab-server`）目前支持斗兽棋与国际象棋，�
 
 | HTTP | `code` | 触发条件 |
 |---|---|---|
-| 400 | `INVALID_REQUEST` | 字段校验没过。`message` 是第一条错误，形如 `side 必须匹配"[rb]"`、`fen 不能为空` |
+| 400 | `INVALID_REQUEST` | 字段校验没过。`message` 是第一条错误，形如 `side 必须匹配"[rb]"`（国际象棋是 `[wb]`）、`legalMoves 不能为空` |
 | 400 | `MALFORMED_BODY` | 请求体不是合法 JSON |
 | 404 | `UNKNOWN_PLAYER` | `playerId` 在配置里找不到 |
 | 404 | `NOT_FOUND` | 路径不存在 |

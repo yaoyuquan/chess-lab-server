@@ -206,7 +206,7 @@ Anthropic 走官方 Java SDK，OpenAI 兼容走 `RestClient` 直连 `/chat/compl
 
 ## 接口
 
-完整的字段说明、错误码与调用约定见 **[doc/api.md](doc/api.md)**。
+完整的字段说明、错误码与调用约定见 **[doc/api.md](doc/api-jungle.md)**。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
